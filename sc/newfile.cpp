@@ -9,7 +9,7 @@
 #include <sstream>
 #include "tables.cpp"
 
-#define KEY_SIZE 21
+#define KEY_SIZE 8
 #define CHECK_INVAL 25
 
 std::string v_comparer(std::string& msg, std::string cgm)
@@ -90,7 +90,7 @@ std::string strip(std::string& cipher)
 	const int n = cipher.size();
 	std::string res(n, 0);
 	for(int i = 0, j = 0; i < n; i++)
-		if(!(cipher[i] == ' ' || cipher[i] == '\n' || cipher[i] == '.' || cipher[i] == ','))
+		if((cipher[i] >= 'A' && cipher[i] <= 'Z') || (cipher[i] >= 'a' && cipher[i] <= 'z'))
 		{
 			res[j] = cipher[i] + (cipher[i] < 'a')*('a'-'A');
 			j++;
@@ -98,167 +98,68 @@ std::string strip(std::string& cipher)
 	return res;
 }
 
-void get_frq(std::string& cipher, std::vector<std::pair<int,int>>& key_prob)
-{
-	const int n = cipher.size();
-	int now, div, ls;
-
-	for(int i = 0; i < n; i++)
-	{
-		ls = i;
-		while(true)
-		{
-			now = find_sub(cipher,ls+2,n,ls);
-			if(now == -1)
-				break;
-			div = now-i;
-			for(int z = 2; z <= KEY_SIZE; z++)
-				if(div%z==0)
-					key_prob[z].second++;
-			ls = now;
-		}
-	}
-}
-
 void get_ltt_frq(std::string& cipher, std::vector<std::vector<double>>& letter_freq)
 {
+	std::vector<double> letter_total(KEY_SIZE, 0.0);
 	const int n = cipher.size();
 	for(int i = 0,j = 0; i < n; i++)
 		if(cipher[i]>= 'a' && cipher[i] <= 'z'){
-			letter_freq[j%KEY_SIZE][cipher[i] - 'a']++;
+			letter_freq[j%KEY_SIZE][cipher[i] - 'a']+=1.0;
+			letter_total[j%KEY_SIZE]+=1.0;
 			j++;
 		}
-}
-
-void do_key(
-	std::string& cipher, std::string& stripped, 
-	int key_s, double* table, 
-	std::vector<std::vector<double>>& letter_freq,
-	std::vector<std::vector<double>>& letter_lcl,
-	std::vector<std::vector<std::pair<int,double>>>& shift_dens,
-	std::string& fileout
-)
-{
-	std::vector<int> it(key_s,0);
-	std::vector<double> letter_total(key_s, 0.0);
-	double best = 1e9;
-	int l = -1, tmp;
-	std::fstream file;
-	std::string key(key_s,0);
-
-	for(int i = 0; i < key_s; i++)
-		for(int j = 0; j < 26; j++)
-		{
-			letter_lcl[i][j]=0.0;
-			shift_dens[i][j]=std::pair<int,double>(j, 0.0);
-		}
-
 	for(int i = 0; i < KEY_SIZE; i++)
-	{
 		for(int j = 0; j < 26; j++)
-		{
-			letter_lcl[i%key_s][j] += letter_freq[i][j];
-			letter_total[i%key_s] += letter_freq[i][j];
-		}
-	}
-
-	for(int i = 0; i < key_s; i++)
-		for(int j = 0; j < 26; j++)
-			letter_lcl[i][j] = (letter_lcl[i][j]*100.0)/letter_total[i];
-	for(int i = 0; i < key_s; i++)
-	{
-		for(int j = 0; j < 26; j++)
-			std::cout << letter_lcl[i][j] << ' ';
-		
-		std::cout << '|' << letter_total[i] << '\n';
-	}
-	
-	for(int i = 0; i < key_s; i++) // pos na senha
-	{
-		for(int j = 0; j < 26; j++) // qtd de shift
-			for(int z = 0; z < 26; z++)
-			// letras do alfabeto
-				shift_dens[i][j].second += abs(letter_lcl[i][(j+z)%26] - table[z]);	
-		
-		std::sort(shift_dens[i].begin(), shift_dens[i].end(), 
-			[&](std::pair<int,double> a, std::pair<int,double> b)
-			{return a.second < b.second;}
-		);
-	}
-
-	for(int i = 0; i < key_s; i++)
-	{
-		for(int j = 0; j < 26; j++)
-			std::cout << (char)(shift_dens[i][j].first + 'A') << ' ' << shift_dens[i][j].second << ' ';
-		std::cout << '\n';
-	}
-	for(int i = 0; i < key_s; i++)
-		key[i] = 'a' + shift_dens[i][0].first;
-	
-	file.open(fileout, std::ofstream::out | std::ofstream::trunc);
-	while(true)
-	{
-		file << key << "|||" << v_decipher(key, cipher) << "\n\n\n";
-		best = 1e9;
-		l = -1;
-		for(int i = 0; i < key_s; i++)
-			if(it[i] < 25)
-				if(l==-1 || best - shift_dens[l][it[l]].second > shift_dens[i][it[i] + 1].second - shift_dens[i][it[i]].second)
-				{
-					best = shift_dens[i][it[i] + 1].second;
-					l = i;
-				}
-		
-
-		if(l == -1) break;
-		it[l]++;
-		key[l] = 'a' + shift_dens[l][it[l]].first;
-		
-	}
-	file.flush();
-	std::cout << "pull\n";
-	std::cin >> tmp;
-	file.close();
+			letter_freq[i][j] = (letter_freq[i][j]*100)/letter_total[i];
 }
 
 void run(std::string &cipher, double *table, std::string fileout)
 {
 	const int n = cipher.size();
-	std::vector<bool> dp(n, 0);
-	std::vector<std::pair<int,int>> key_prob(KEY_SIZE);
-	std::string facl = strip(cipher);
+	std::string facl = strip(cipher), key(n,0);
 	std::vector<std::vector<double>> letter_freq(KEY_SIZE, std::vector<double>(26,0.0));
-	std::vector<std::vector<double>> letter_lcl(KEY_SIZE,  std::vector<double>(26,0.0));
 	std::vector<std::vector<std::pair<int, double>>> shift_dens(KEY_SIZE, 
-											   std::vector<std::pair<int, double>>(26));
-
-	for(int i = 0 ; i < KEY_SIZE; i++)
-		key_prob[i] = std::pair<int,int>(i,0);
-
-	get_frq(facl, key_prob);
-	
+											   std::vector<std::pair<int, double>>(26,{0,0.0}));
+	std::vector<int> positions(KEY_SIZE,0);
 	get_ltt_frq(facl, letter_freq);
 
-	std::sort(key_prob.begin(), key_prob.end(), 
-		[](std::pair<int,int> a, std::pair<int,int> b)
-		{ return a.second > b.second;}
-	);			
+	for(int i = 0; i < KEY_SIZE; i++) // pos na senha
+	{
+		for(int j = 0; j < 26; j++)
+		{ // qtd de shift
+			shift_dens[i][j].first = j;
+			for(int z = 0; z < 26; z++)
+			// letras do alfabeto
+				shift_dens[i][j].second += abs(letter_freq[i][(j+z)%26] - table[z]);	
+		}
+		std::sort(shift_dens[i].begin(), shift_dens[i].end(), 
+			[&](std::pair<int,double> a, std::pair<int,double> b)
+			{return a.second < b.second;}
+		);
+	}
 	for(int i = 0; i < KEY_SIZE; i++)
-		std::cout << key_prob[i].first << ' ' << key_prob[i].second << ' ';
-	std::cout << '\n';
+		key[i] = 'a' + shift_dens[i][0].first;
+	int pos = 1;
+	char act;
+	while(true)
+	{
+		std::cout << "CHOOSE : ";
+		std::cin >> pos;
+		if(pos == -1) break;
 
-	for(int i = 0; i < KEY_SIZE; i++)
-		if(key_prob[i].second != 0)
-			do_key(
-				cipher,
-				facl,
-				key_prob[i].first,
-				table,
-				letter_freq, 
-				letter_lcl, 
-				shift_dens,
-				fileout
-			);
+		std::cin >> act;
+		if(act == '-' && positions[pos]>0)
+		{
+			positions[pos]--;
+			key[pos] = 'a' + shift_dens[pos][positions[pos]].first;
+		}
+		else if(act == '+' && positions[pos] < 25)
+		{
+			positions[pos]++;
+			key[pos] = 'a' + shift_dens[pos][positions[pos]].first;
+		}
+		std::cout << key << " ----> " << v_decipher(key, cipher) << "\n\n\n\n";
+	}
 }
 
 int main(int argc, char** argv)
