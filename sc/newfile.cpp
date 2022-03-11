@@ -11,16 +11,17 @@
 #include "tables.cpp"
 
 #define CHECK_INVAL 25
-
+//funcao de comparacao que serve para filtrar as melhores chaves
 bool set_cmp(const std::pair<std::string, double>& a, const std::pair<std::string, double>& b)
 {
 	return a.second < b.second;
 }
 
+//TIMES eh a quantidade de chaves que devem ser geradas pelo programa
 int KEY_SIZE, TIMES;
-std::ofstream FILEOUT;
 std::set<std::pair<std::string, double>, decltype(&set_cmp)> best_keys(&set_cmp);
 
+//faz uma senha que transforma msg em cgm
 std::string v_comparer(std::string& msg, std::string cgm)
 {
 	const int n = msg.size();
@@ -36,6 +37,7 @@ std::string v_comparer(std::string& msg, std::string cgm)
 	return res;
 }
 
+//Cifra de Vigenere
 std::string v_cipher(std::string& senha, const std::string msg)
 {
 	const int n = msg.size(), ns = senha.size();
@@ -60,6 +62,7 @@ std::string v_cipher(std::string& senha, const std::string msg)
 	return res;
 }
 
+//decifra um criptograma Vigenere
 std::string v_decipher(std::string& senha, const std::string cgm)
 {
 	const int n = cgm.size(), ns = senha.size();
@@ -81,6 +84,7 @@ std::string v_decipher(std::string& senha, const std::string cgm)
 	return res;
 }
 
+//transforma a string inicial em uma string apenas com letras ascii
 std::string strip(std::string& cipher)
 {
 	const int n = cipher.size();
@@ -94,21 +98,27 @@ std::string strip(std::string& cipher)
 	return res;
 }
 
+//pega as frequencias relativas das letras para todas as letras da chave
 void get_ltt_frq(std::string& cipher, std::vector<std::vector<double>>& letter_freq)
 {
 	std::vector<double> letter_total(KEY_SIZE, 0.0);
 	const int n = cipher.size();
+	//calculo de frequencias absolutas
 	for(int i = 0,j = 0; i < n; i++)
 		if(cipher[i]>= 'a' && cipher[i] <= 'z'){
 			letter_freq[j%KEY_SIZE][cipher[i] - 'a']+=1.0;
 			letter_total[j%KEY_SIZE]+=1.0;
 			j++;
 		}
+	//calculo de frequencias relativas
 	for(int i = 0; i < KEY_SIZE; i++)
 		for(int j = 0; j < 26; j++)
 			letter_freq[i][j] = (letter_freq[i][j]*100)/letter_total[i];
 }
 
+//eh o programa em questao. A partir da variavel global KEY_SIZE, geramos as 15
+//melhores chaves de tamanho KEY_SIZE e filtramos todas pelo std::set, de forma que 
+//no fim do programa apenas as TIMES melhores chaves estao disponiveis.
 void run(std::string &cipher, double *table)
 {
 	const int n = cipher.size();
@@ -118,6 +128,7 @@ void run(std::string &cipher, double *table)
 											   std::vector<std::pair<int, double>>(26,{0,0.0}));
 	std::vector<int> positions(KEY_SIZE,0);
 	double quality = 0.0;
+
 	get_ltt_frq(facl, letter_freq);
 
 	for(int i = 0; i < KEY_SIZE; i++) // pos na senha
@@ -169,6 +180,70 @@ void run(std::string &cipher, double *table)
 	}
 }
 
+void breaking_hub(std::string& cipher, double* table, std::string fileout)
+{
+	const int last = std::min(45, (int)cipher.size());
+
+	for(int i = 2; i <= last; i++)
+	{
+		KEY_SIZE = i; //tamanho da chave que estamos tentando
+		run(cipher, table); //processo de criacao e ordenacao das chaves geradas
+	}
+	
+	std::ofstream file;
+	//serve para limpar os dados anteriores da file
+	file.open(fileout, std::ofstream::out | std::ofstream::trunc); 
+	file.close();
+	file.open(fileout);
+	//serve para pegar TIMES chaves em ordem de qualidade
+	for(auto it = best_keys.begin(); it != best_keys.end(); it++)
+	{
+		std::string key = it->first;
+		file << key << " ----> " << v_decipher(key, cipher) << "\n\n\n\n";
+	}
+}
+//serve para quando apenas 2 argumentos sejam entregados para o programa
+//se a segunda entrada for uma file, utilisamos o primeiro argumento para decifrar
+//o arquivo. Caso contrario, criamos uma senha de mesmo tamanho das strings fornecidas
+//que transforme a string1 em string2.
+void utilities(std::string lf, std::string rg)
+{
+	if(lf.find(".txt") != std::string::npos)
+	{
+		std::ifstream file(lf);
+		std::stringstream strbf;
+		strbf << file.rdbuf();
+		rg = strbf.str();
+		file.close();
+		std::cout << v_decipher(lf,rg);
+	}
+	else
+		std::cout << v_comparer(lf,rg);
+		
+}
+
+void load_table(double* table, std::string language)
+{
+	if(language == "pt")
+		portugues(table);
+	else
+		ingles(table);
+}
+
+std::string load_cipher(std::string f_input)
+{
+	if(f_input.find(".txt") != std::string::npos)
+	{
+		std::ifstream file(f_input);
+		std::stringstream strbf;
+		strbf << file.rdbuf();
+		file.close();
+		return strbf.str();
+	}
+	else
+		return f_input;
+}
+
 int main(int argc, char** argv)
 {
 	if(argc < 3)
@@ -178,56 +253,15 @@ int main(int argc, char** argv)
 	}
 	if(argc == 3)
 	{
-		std::string a = argv[1], cipher = argv[2];
-		if(strstr(argv[2],".txt"))
-		{
-			std::ifstream file(argv[2]);
-			std::stringstream strbf;
-			strbf << file.rdbuf();
-			cipher = strbf.str();
-			file.close();
-			std::cout << v_decipher(a,cipher);
-		}
-		else
-			std::cout << v_comparer(a,cipher);
+		utilities(argv[1], argv[2]);
 		return 0;	
 	}
 	
-	{
-		std::fstream file;
-		file.open(argv[3], std::ofstream::out | std::ofstream::trunc);
-		file.close();
-	}
-	FILEOUT.open(argv[3]);
-	std::string cipher;
-	double table[26];
-	if(strcmp(argv[1], "pt"))
-		portugues(table);
-	else
-		ingles(table);
+	std::string cipher = load_cipher(argv[2]);
 	
-	if(strstr(argv[2],".txt"))
-	{
-		std::ifstream file(argv[2]);
-		std::stringstream strbf;
-		strbf << file.rdbuf();
-		cipher = strbf.str();
-		file.close();
-	}
-	else
-		cipher = argv[2];
+	double table[26];
+	load_table(table, argv[1]);
 
-	TIMES = atoi(argv[6]);
-
-	const int last = atoi(argv[5]);
-	for(int i = atoi(argv[4]); i <= last; i++)
-	{
-		KEY_SIZE = i;
-		run(cipher, table);
-	}
-	for(auto it = best_keys.begin(); it != best_keys.end(); it++)
-	{
-		std::string key = it->first;
-		FILEOUT << key << " ----> " << v_decipher(key, cipher) << "\n\n\n\n";
-	}
+	TIMES = atoi(argv[4]);
+	breaking_hub(cipher,table,argv[3]);
 }
