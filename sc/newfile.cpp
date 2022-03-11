@@ -74,19 +74,6 @@ std::string v_decipher(std::string& senha, const std::string cgm)
 	return res;
 }
 
-int find_sub(std::string &cipher, int l, int r, int d)
-{
-	int i,j;
-	r-=1;
-	for(i = l; i < r; i++)
-	{
-		for(j = 0; j < 2 && cipher[i+j] == cipher[d+j]; j++);
-		if(j == 2)
-			return i;
-	}
-	return -1;
-}
-
 std::string strip(std::string& cipher)
 {
 	const int n = cipher.size();
@@ -141,6 +128,7 @@ void run(std::string &cipher, double *table)
 	}
 	for(int i = 0; i < KEY_SIZE; i++)
 		key[i] = 'a' + shift_dens[i][0].first;
+
 	int l;
 	for(int i =0 ; i < TIMES; i++)
 	{	
@@ -154,8 +142,10 @@ void run(std::string &cipher, double *table)
 				{	
 					l = j;
 				}
+			
 			if(l==-1)
 				return;
+
 			positions[l]++;
 			key[l] = 'a' + shift_dens[l][positions[l]].first;
 		}

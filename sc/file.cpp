@@ -286,7 +286,7 @@ int main(int argc, char** argv)
 	}
 	std::string cipher;
 	double table[26];
-	if(strcmp(argv[1], "pt"))
+	if(strcmp(argv[1], "pt")==0)
 		portugues(table);
 	else
 		ingles(table);
