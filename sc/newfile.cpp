@@ -9,8 +9,10 @@
 #include <sstream>
 #include "tables.cpp"
 
-#define KEY_SIZE 8
 #define CHECK_INVAL 25
+
+int KEY_SIZE, TIMES;
+std::ofstream FILEOUT;
 
 std::string v_comparer(std::string& msg, std::string cgm)
 {
@@ -113,10 +115,10 @@ void get_ltt_frq(std::string& cipher, std::vector<std::vector<double>>& letter_f
 			letter_freq[i][j] = (letter_freq[i][j]*100)/letter_total[i];
 }
 
-void run(std::string &cipher, double *table, std::string fileout)
+void run(std::string &cipher, double *table)
 {
 	const int n = cipher.size();
-	std::string facl = strip(cipher), key(n,0);
+	std::string facl = strip(cipher), key(KEY_SIZE,0);
 	std::vector<std::vector<double>> letter_freq(KEY_SIZE, std::vector<double>(26,0.0));
 	std::vector<std::vector<std::pair<int, double>>> shift_dens(KEY_SIZE, 
 											   std::vector<std::pair<int, double>>(26,{0,0.0}));
@@ -139,26 +141,24 @@ void run(std::string &cipher, double *table, std::string fileout)
 	}
 	for(int i = 0; i < KEY_SIZE; i++)
 		key[i] = 'a' + shift_dens[i][0].first;
-	int pos = 1;
-	char act;
-	while(true)
-	{
-		std::cout << "CHOOSE : ";
-		std::cin >> pos;
-		if(pos == -1) break;
-
-		std::cin >> act;
-		if(act == '-' && positions[pos]>0)
+	int l;
+	for(int i =0 ; i < TIMES; i++)
+	{	
+		FILEOUT << key << " ----> " << v_decipher(key, cipher) << "\n\n\n\n";
+		l = -1;
+		for(int j = 0; j < KEY_SIZE; j++)
 		{
-			positions[pos]--;
-			key[pos] = 'a' + shift_dens[pos][positions[pos]].first;
+			if(positions[j] < 25)
+				if(l == -1 || (shift_dens[l][positions[l]+1].second - shift_dens[l][positions[l]].second > 
+								shift_dens[j][positions[j]+1].second-shift_dens[j][positions[j]].second))
+				{	
+					l = j;
+				}
+			if(l==-1)
+				return;
+			positions[l]++;
+			key[l] = 'a' + shift_dens[l][positions[l]].first;
 		}
-		else if(act == '+' && positions[pos] < 25)
-		{
-			positions[pos]++;
-			key[pos] = 'a' + shift_dens[pos][positions[pos]].first;
-		}
-		std::cout << key << " ----> " << v_decipher(key, cipher) << "\n\n\n\n";
 	}
 }
 
@@ -185,6 +185,13 @@ int main(int argc, char** argv)
 			std::cout << v_comparer(a,cipher);
 		return 0;	
 	}
+	
+	{
+		std::fstream file;
+		file.open(argv[3], std::ofstream::out | std::ofstream::trunc);
+		file.close();
+	}
+	FILEOUT.open(argv[3]);
 	std::string cipher;
 	double table[26];
 	if(strcmp(argv[1], "pt"))
@@ -202,5 +209,13 @@ int main(int argc, char** argv)
 	}
 	else
 		cipher = argv[2];
-	run(cipher, table, argv[3]);
+
+	TIMES = atoi(argv[6]);
+
+	const int last = atoi(argv[5]);
+	for(int i = atoi(argv[4]); i <= last; i++)
+	{
+		KEY_SIZE = i;
+		run(cipher, table);
+	}
 }
