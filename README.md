@@ -1,3 +1,6 @@
+### WHAT DOES IT DO
+	This program is a Vigenère cipher/decipher with an additional function, which is the auto-key. The latter is an automatic way to break Vigenère ciphered texts, where the output is composed of the best keys the program can find. The analysis made to determine the best keys is called Frequency Analysis.
+
 ### HOW TO USE
 
 The program receives variable arguments:
