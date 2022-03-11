@@ -8,17 +8,17 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
-#include "tables.cpp"
+#include "tables.h"
 
-#define CHECK_INVAL 25
+double L_QUALITY = 1e9;
+
 //funcao de comparacao que serve para filtrar as melhores chaves
 bool set_cmp(const std::pair<std::string, double>& a, const std::pair<std::string, double>& b)
 {
 	return a.second < b.second;
 }
 
-//TIMES eh a quantidade de chaves que devem ser geradas pelo programa
-int KEY_SIZE, TIMES;
+int KEY_SIZE;
 std::set<std::pair<std::string, double>, decltype(&set_cmp)> best_keys(&set_cmp);
 
 //faz uma senha que transforma msg em cgm
@@ -118,7 +118,7 @@ void get_ltt_frq(std::string& cipher, std::vector<std::vector<double>>& letter_f
 
 //eh o programa em questao. A partir da variavel global KEY_SIZE, geramos as 15
 //melhores chaves de tamanho KEY_SIZE e filtramos todas pelo std::set, de forma que 
-//no fim do programa apenas as TIMES melhores chaves estao disponiveis.
+//no fim do programa apenas as melhores chaves estao disponiveis.
 void run(std::string &cipher, double *table)
 {
 	const int n = cipher.size();
@@ -126,7 +126,6 @@ void run(std::string &cipher, double *table)
 	std::vector<std::vector<double>> letter_freq(KEY_SIZE, std::vector<double>(26,0.0));
 	std::vector<std::vector<std::pair<int, double>>> shift_dens(KEY_SIZE, 
 											   std::vector<std::pair<int, double>>(26,{0,0.0}));
-	std::vector<int> positions(KEY_SIZE,0);
 	double quality = 0.0;
 
 	get_ltt_frq(facl, letter_freq);
@@ -154,36 +153,12 @@ void run(std::string &cipher, double *table)
 		quality += shift_dens[i][0].second;
 	}
 
-	int l;
-	for(int i =0 ; i < 15; i++)
-	{	
-		const auto it = prev(best_keys.end());
-		// Filtro das melhores chaves geradas baseado na qualidade/tamanho_chave
-		if(best_keys.size() < TIMES)
-			best_keys.insert({key, quality});
-		else if(it->second > quality/KEY_SIZE)
-		{
-			best_keys.erase(prev(best_keys.end()));
-			best_keys.insert({key, quality/KEY_SIZE});	
-		}
-
-		l = -1;
-		// busca pela proxima melhor chave.
-		for(int j = 0; j < KEY_SIZE; j++)
-			if(positions[j] < 25)
-				if(l == -1 || (shift_dens[l][positions[l]+1].second - shift_dens[l][positions[l]].second > 
-								shift_dens[j][positions[j]+1].second-shift_dens[j][positions[j]].second))
-				{	
-					l = j;
-				}
-		
-		if(l==-1)
-			return;
-		//caso tenha uma proxima melhor chave, a chave atual eh atualizada, como tambem eh a qualidade.
-		positions[l]++;
-		key[l] = 'a' + shift_dens[l][positions[l]].first;
-		quality += shift_dens[l][positions[l]].second - shift_dens[l][positions[l] - 1].second;
-	}
+	const auto it = prev(best_keys.end());
+	// Filtro das melhores chaves geradas baseado na qualidade/tamanho_chave
+	const double qks = quality/((double)KEY_SIZE);
+	if(best_keys.size() == 0 || qks < L_QUALITY)
+		best_keys.insert({key, qks});	
+	L_QUALITY = qks;
 }
 
 void breaking_hub(std::string& cipher, double* table, std::string fileout)
@@ -201,7 +176,7 @@ void breaking_hub(std::string& cipher, double* table, std::string fileout)
 	file.open(fileout, std::ofstream::out | std::ofstream::trunc); 
 	file.close();
 	file.open(fileout);
-	//serve para pegar TIMES chaves em ordem de qualidade
+	//serve para pegar as chaves em ordem de qualidade
 	for(auto it = best_keys.begin(); it != best_keys.end(); it++)
 	{
 		std::string key = it->first;
@@ -268,6 +243,5 @@ int main(int argc, char** argv)
 	double table[26];
 	load_table(table, argv[1]);
 
-	TIMES = atoi(argv[4]);
 	breaking_hub(cipher,table,argv[3]);
 }

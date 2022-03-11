@@ -7,7 +7,7 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
-#include "tables.cpp"
+#include "tables.h"
 
 #define KEY_SIZE 21
 #define CHECK_INVAL 25
