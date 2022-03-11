@@ -4,6 +4,7 @@
 #include <map>
 #include <algorithm>
 #include <string>
+#include <set>
 #include <cstring>
 #include <fstream>
 #include <sstream>
@@ -11,8 +12,14 @@
 
 #define CHECK_INVAL 25
 
+bool set_cmp(const std::pair<std::string, double>& a, const std::pair<std::string, double>& b)
+{
+	return a.second < b.second;
+}
+
 int KEY_SIZE, TIMES;
 std::ofstream FILEOUT;
+std::set<std::pair<std::string, double>, decltype(&set_cmp)> best_keys(&set_cmp);
 
 std::string v_comparer(std::string& msg, std::string cgm)
 {
@@ -110,6 +117,7 @@ void run(std::string &cipher, double *table)
 	std::vector<std::vector<std::pair<int, double>>> shift_dens(KEY_SIZE, 
 											   std::vector<std::pair<int, double>>(26,{0,0.0}));
 	std::vector<int> positions(KEY_SIZE,0);
+	double quality = 0.0;
 	get_ltt_frq(facl, letter_freq);
 
 	for(int i = 0; i < KEY_SIZE; i++) // pos na senha
@@ -127,28 +135,37 @@ void run(std::string &cipher, double *table)
 		);
 	}
 	for(int i = 0; i < KEY_SIZE; i++)
+	{
 		key[i] = 'a' + shift_dens[i][0].first;
+		quality += shift_dens[i][0].second;
+	}
 
 	int l;
-	for(int i =0 ; i < TIMES; i++)
+	for(int i =0 ; i < 15; i++)
 	{	
-		FILEOUT << key << " ----> " << v_decipher(key, cipher) << "\n\n\n\n";
+		const auto it = prev(best_keys.end());
+		if(best_keys.size() < TIMES)
+			best_keys.insert({key, quality});
+		if(it->second > quality/KEY_SIZE)
+		{
+			best_keys.erase(prev(best_keys.end()));
+			best_keys.insert({key, quality/KEY_SIZE});	
+		}
 		l = -1;
 		for(int j = 0; j < KEY_SIZE; j++)
-		{
 			if(positions[j] < 25)
 				if(l == -1 || (shift_dens[l][positions[l]+1].second - shift_dens[l][positions[l]].second > 
 								shift_dens[j][positions[j]+1].second-shift_dens[j][positions[j]].second))
 				{	
 					l = j;
 				}
-			
-			if(l==-1)
-				return;
+		
+		if(l==-1)
+			return;
 
-			positions[l]++;
-			key[l] = 'a' + shift_dens[l][positions[l]].first;
-		}
+		positions[l]++;
+		key[l] = 'a' + shift_dens[l][positions[l]].first;
+		quality += shift_dens[l][positions[l]].second - shift_dens[l][positions[l] - 1].second;
 	}
 }
 
@@ -207,5 +224,10 @@ int main(int argc, char** argv)
 	{
 		KEY_SIZE = i;
 		run(cipher, table);
+	}
+	for(auto it = best_keys.begin(); it != best_keys.end(); it++)
+	{
+		std::string key = it->first;
+		FILEOUT << key << " ----> " << v_decipher(key, cipher) << "\n\n\n\n";
 	}
 }
