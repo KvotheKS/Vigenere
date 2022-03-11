@@ -140,11 +140,14 @@ void run(std::string &cipher, double *table)
 			// letras do alfabeto
 				shift_dens[i][j].second += abs(letter_freq[i][(j+z)%26] - table[z]);	
 		}
+		// Ordena as letras para a posicao i da chave.
 		std::sort(shift_dens[i].begin(), shift_dens[i].end(), 
 			[&](std::pair<int,double> a, std::pair<int,double> b)
 			{return a.second < b.second;}
 		);
 	}
+	// carrega a chave com as melhores letras de cada posicao
+	// inicializa a qualidade da chave
 	for(int i = 0; i < KEY_SIZE; i++)
 	{
 		key[i] = 'a' + shift_dens[i][0].first;
@@ -155,14 +158,17 @@ void run(std::string &cipher, double *table)
 	for(int i =0 ; i < 15; i++)
 	{	
 		const auto it = prev(best_keys.end());
+		// Filtro das melhores chaves geradas baseado na qualidade/tamanho_chave
 		if(best_keys.size() < TIMES)
 			best_keys.insert({key, quality});
-		if(it->second > quality/KEY_SIZE)
+		else if(it->second > quality/KEY_SIZE)
 		{
 			best_keys.erase(prev(best_keys.end()));
 			best_keys.insert({key, quality/KEY_SIZE});	
 		}
+
 		l = -1;
+		// busca pela proxima melhor chave.
 		for(int j = 0; j < KEY_SIZE; j++)
 			if(positions[j] < 25)
 				if(l == -1 || (shift_dens[l][positions[l]+1].second - shift_dens[l][positions[l]].second > 
@@ -173,7 +179,7 @@ void run(std::string &cipher, double *table)
 		
 		if(l==-1)
 			return;
-
+		//caso tenha uma proxima melhor chave, a chave atual eh atualizada, como tambem eh a qualidade.
 		positions[l]++;
 		key[l] = 'a' + shift_dens[l][positions[l]].first;
 		quality += shift_dens[l][positions[l]].second - shift_dens[l][positions[l] - 1].second;
